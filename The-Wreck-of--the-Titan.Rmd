@@ -1,0 +1,145 @@
+---
+title: "The Wreck of the Titan Sentiment Analysis"
+runningheader: "Sentiment Analysis" # only for pdf output
+subtitle: "" # only for html output
+author: "B.M Njuguna"
+date: "`r Sys.Date()`"
+output:
+  tufte::tufte_html: default
+  tufte::tufte_handout:
+    citation_package: natbib
+    latex_engine: xelatex
+  tufte::tufte_book:
+    citation_package: biblatex
+    latex_engine: xelatex
+number_sections: no
+toc: no
+toc_depth: 4
+nocite: '@'
+bibliography: ref.bib
+biblio-style: apa
+link-citations: yes
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(cache.extra = packageVersion('tufte'), comment = NA, warning = FALSE,
+                      message = FALSE, cache = TRUE, echo = TRUE)
+options(htmltools.dir.version = FALSE)
+
+```
+
+```{r, loading-packages,include=FALSE}
+# Loading the packages
+library(pacman)
+p_load(readxl, dplyr, ModelMetrics, tm, gmodels, ggplot2, wordcloud, knitr)
+```
+
+\section{\textcolor{red}{\large\bfseries{Chapter One: Introduction}}}
+
+\subsection{\textcolor{blue}{1.o Background Information}}
+
+The **Wreck of the Titan** is a novel that was written by American
+writer **Morgan Robertson** (@robertson1912wreck) . It was first
+published in 1898, and then later republished in 1912. The fictional
+story is about a ship called *Titan* which sinks in the North Atlantic
+Ocean, after hitting a iceberg, resulting to loss of most of its
+passengers and crew. This novel was written 14 yeas before the sinking
+of the RMS Titanic ship in 1912. The similarities between the fictional
+story and the actual event of the sinking of the ship in 1912 have led
+to much speculations about whether Robertson's may have inspired or even
+predicted the Titanic Disaster.
+
+Robertson describes the ship as a large unsinkable passenger liner with
+many of the features similar to the titanic (@donnelly2000titanic). The
+ship in the fictional story travels at high speed in a sea filled with
+icebergs which is similar to the Titanic ship. The book's description
+about the sinking of the ship have similarities with the actual
+description of the sinking of the ship. Also, in the book, there are
+challenges such as lack of enough life boats and confusion among the
+crew which are similar to the actual sinking of the ship. The books
+prescient warning about the dangers of the overconfidence in the face of
+natural disasters.
+
+**Sentiment analysis** is a technique used to extract, identify and/or
+identify subjective information from text or novel
+(@mejova2009sentiment). It is a sub-field of Natural Language Processing
+that is also used to identify whether the sentiment of a text, novel or
+document is positive, negative or neutral. Sentiment analysis started in
+the 1950s with simple use of lexical (lexicons)[^1] and heuristics
+database to identify and classify words as positive and negative.
+However, these early attempts were limited by their accuracy and
+effectiveness.
+
+[^1]: Lexicons are dictionaries or lists of words and their meanings,
+    often used in natural language processing and computational
+    linguistics. They can also include additional information about
+    words such as part-of-speech, pronunciation, and syntactic behavior.
+    Lexicons can be created manually or automatically generated from
+    large text corpora.
+
+The field of sentiment analysis advanced significantly at around 2000
+with the invention of more sophisticated machine learning algorithms and
+the availability of large amounts of labelled data for training and
+testing (@mantyla2018evolution).
+
+\subsection{\textcolor{blue}{Objectives of the Study}}
+
+1.  The objective of this study was to examine the general sentiment of
+    the novel *The wreck of the titanic*.
+
+2.  Examine the change of emotions across the trajectory of the novel.
+
+3.  Compare the results of different performances of the lexicons used.
+
+\section{\textcolor{red}{Methodology}}
+
+Basically, sentiment analysis method was used in this study. The study
+was done using *R statistical package*. Specifically, lexicons in R were
+used to obtain the sentiment of the novels.
+
+First, The R package *gutenbergr* was used to download the novel in R.
+Then the R package *tidytext* was used to clean and put the text in the
+novel in the tidy format easier analysis. *tidytext* was also used to
+download the lexicons for the sentiment analysis. The three lexicons
+used for the analysis were as listed below;
+
+-   **AFINN**
+
+-   **Bing**
+
+-   **NRC**
+
+All three lexicons are based on unigrams, i.e., single words. These
+lexicons contain many English words and the words are assigned scores
+for positive/negative sentiment, and also possibly emotions like joy,
+anger, sadness, and so forth. The **NRC** lexicon **categorizes words in
+a binary fashion ("yes"/"no") into categories of positive**, **negative,
+anger, anticipation, disgust, fear, joy, sadness, surprise, and trust**.
+The **Bing** lexicon **categorizes words in a binary fashion into
+positive and negative categories**. The **AFINN** lexicon **assigns
+words with a score that runs between -5 and 5, with negative** **scores
+indicating negative sentiment and positive scores indicating positive
+sentiment**.
+
+\section{\textcolor{red}{Data Analysis}}
+
+The novel was downloaded in R and the glimpse of the first part of the
+first page is shown below;
+
+```{r}
+# Checking which id is the novel
+# Foirst we llok up for novels written by Robertson
+
+library(gutenbergr)
+robertson_books <- gutenberg_works(author == "Robertson, Morgan")
+
+# Downloading the novel after identifyig the ID of the novel
+
+titanic <- gutenberg_download(24880)
+cat(head(titanic$text, c(100)), sep = "\n")
+```

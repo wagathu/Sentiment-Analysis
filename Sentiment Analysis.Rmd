@@ -1,0 +1,349 @@
+---
+title: "Sentiment Analysis"
+runningheader: "Sentiment Analysis" # only for pdf output
+subtitle: "" # only for html output
+author: "B.M Njuguna"
+date: "`r Sys.Date()`"
+output:
+  tufte::tufte_html: default
+  tufte::tufte_handout:
+    citation_package: natbib
+    latex_engine: xelatex
+  tufte::tufte_book:
+    citation_package: natbib
+    latex_engine: xelatex
+header-includes:
+  - \renewcommand{\contentsname}{\small Table of Contents}
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+setwd("E:/Desktop/naive bayes")
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(cache.extra = packageVersion('tufte'), comment = NA, warning = FALSE,
+                      message = FALSE, cache = TRUE, echo = TRUE)
+options(htmltools.dir.version = FALSE)
+
+```
+
+```{r, loading-packages,include=FALSE}
+# Loading the packages
+library(pacman)
+p_load(readxl, dplyr, ModelMetrics, tm, gmodels, ggplot2, wordcloud, knitr)
+```
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{\textcolor{red}{\huge\bfseries{Introduction}}}
+
+When human readers
+approach a text, we use our understanding of the emotional intent of words to infer
+whether a section of text is positive or negative, or perhaps characterized by some
+other more nuanced emotion like surprise or disgust. We can use the tools of text
+mining to approach the emotional content of text programmatically. One way to analyze the sentiment of a text is to consider the text as a combination of
+its individual words, and the sentiment content of the whole text as the sum of the
+sentiment content of the individual words. This is not the only way for sentiment analysis.
+
+\subsection{\textcolor{red}{\large\bfseries{Sentiment Datasets in R}}}
+
+As discussed above, there are a variety of methods and dictionaries that exist for evaluating
+opinion or emotion in text. The tidytext package contains several sentiment
+lexicons in the sentiments dataset.
+
+```{r}
+library(tidytext)
+head(sentiments)
+```
+
+The three general purpose lexicons^[Lexicons are dictionaries or lists of words and their meanings, often used in natural language processing and computational linguistics. They can also include additional information about words such as part-of-speech, pronunciation, and syntactic behavior. Lexicons can be created manually or automatically generated from large text corpora.] are
+
+- **AFINN**
+
+- **Bing**
+
+- **NRC**
+
+All three lexicons are based on unigrams, i.e., single words. These lexicons contain
+many English words and the words are assigned scores for positive/negative sentiment,
+and also possibly emotions like joy, anger, sadness, and so forth. The **NRC** lexicon
+**categorizes words in a binary fashion (“yes”/“no”) into categories of positive**,
+**negative, anger, anticipation, disgust, fear, joy, sadness, surprise, and trust**. The **Bing**
+lexicon **categorizes words in a binary fashion into positive and negative categories**.
+The **AFINN** lexicon **assigns words with a score that runs between -5 and 5, with negative**
+**scores indicating negative sentiment and positive scores indicating positive sentiment**.
+All of this information is tabulated in the sentiments dataset, and tidytext
+provides the function `get_sentiments()` to get specific sentiment lexicons withoutthe columns that are not used in that lexicon. They are shown below;
+
+```{r}
+kable(head(get_sentiments("afinn")))
+```
+
+
+```{r}
+kable(head(get_sentiments("bing")))
+```
+
+
+```{r}
+
+kable(head(get_sentiments("nrc")))
+```
+
+
+There are also some domain-specific sentiment lexicons available, constructed to be
+used with text from a specific content area. “Example: Mining Financial Articles” is specifically used for finance.
+
+Not every English word is in the lexicons because many English words are pretty neutral.
+It is important to keep in mind that these methods do not take into account
+qualifiers before a word, such as in “no good” or “not true”; a lexicon-based method
+like this is based on unigrams only. For many kinds of text (like the narrative examples
+below), there are no sustained sections of sarcasm or negated text, so this is not
+an important effect. Also, we can use a tidy text approach to begin to understand
+what kinds of negation words are important in a given text; an
+extended example of such an analysis will be done later.
+One last caveat is that the size of the chunk of text that we use to add up unigram
+sentiment scores can have an effect on an analysis. A text the size of many paragraphs
+can often have positive and negative sentiment averaging out to about zero, while
+sentence-sized or paragraph-sized text often works better.
+
+
+\section{\textcolor{red}{\large\bfseries{Sentiment Analysis with Inner Join}}}
+
+With data in a tidy format, sentiment analysis can be done as an inner join^[ "inner join" is a term that originates from relational databases and refers to a type of join operation that returns only the rows that have matching values in both tables being joined]. This is
+another of the great successes of viewing text mining as a tidy data analysis^[Tidy data analysis is an approach to organizing and analyzing data that follows a set of principles called the "tidy data" framework. This framework was introduced by statistician Hadley Wickham and is based on the idea that data should be structured in a consistent and standardized way to facilitate analysis and modeling.
+
+The basic principles of tidy data include:
+
+1. Each variable should be in a separate column.
+2. Each observation should be in a separate row.
+3. Each value should be in a separate cell.
+4 .There should be a clear and consistent structure to the data.] task—
+much as removing stop words is an anti-join operation, performing sentiment analysis is an inner join operation.
+
+Let’s look at the words with a joy score from the NRC lexicon. What are the most
+common joy words in *Emma*?^["Emma" is a novel written by Jane Austen, published in 1815. It tells the story of Emma Woodhouse, a young and wealthy woman in Regency England, who fancies herself a matchmaker and sets out to meddle in the romantic lives of her friends and acquaintances, with unexpected consequences. The novel explores themes of social class, love, and self-discovery, and is considered one of Austen's most popular and beloved works.] First, we need to take the text of the novel and convert
+the text to the tidy format using `unnest_tokens()`, It is done as follows ^[The "janeaustenr" package is a collection of Jane Austen's six major novels in plain text format, including "Emma", "Pride and Prejudice", and "Sense and Sensibility". The package provides a convenient way to access and manipulate the texts using the R programming language.];
+
+```{r}
+library(janeaustenr)
+library(dplyr)
+library(stringr)
+
+tidy_books <- austen_books() %>%
+group_by(book) %>%
+mutate(linenumber = row_number(),
+chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+ignore_case = TRUE)))) %>%
+ungroup() %>%
+unnest_tokens(word, text)
+```
+
+
+`austen_books()` retrieves a collection of books written by Jane Austen, which is a built-in dataset in the R package janeaustenr.
+
+`group_by(book)` groups the books in the dataset by book, so that each book is treated as a separate entity.
+
+`mutate(linenumber = row_number(), chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]", ignore_case = TRUE))))` adds two new columns to the data frame:
+
+`linenumber`: assigns a unique number to each line of text within each book using the row_number() function.
+
+`chapter`: uses `str_detect()` and a regular expression to identify lines of text that begin with the word "Chapter" (ignoring case), then uses `cumsum()` to create a running total of those lines of text, thereby **assigning each line** **to a specific chapter.**
+
+`ungroup()` removes the grouping by book, so that the data frame is no longer organized by book.
+
+`unnest_tokens(word, text)` splits the text of each book into individual words, creating a new row for each word in the dataset. This process is referred to as "tokenizing" the text. The resulting data frame has four columns: "book", "linenumber", "chapter", and "word".
+
+The resulting tidy_books data set contains all six novels by Jane Austen: "Sense and Sensibility", "Pride and Prejudice", "Mansfield Park", "Emma", "Northanger Abbey", and "Persuasion". Each row in the data set corresponds to a single word from one of the books, and the book that the word belongs to is identified in the "book" column.
+
+The regex() function is used to create a regular expression, which is a pattern that describes a set of strings. In this case, the regular expression ^chapter [\\divxlc] is used to match lines of text that begin with the word "Chapter" (ignoring case) followed by a space and then a single character that can be any of the following: "i", "v", "x", "l", or "c". 
+
+Here is a breakdown of the different parts of the regular expression:
+
+- ^ matches the start of a line.
+
+- chapter matches the word "Chapter".
+
+- [\\divxlc] matches a single character that can be any of the following: "i", "v", "x", "l", or "c". The \\ is used to escape the special meaning of the backslash character, so that it is interpreted literally. "ignoring case" means that the matching of the word "Chapter" is not case-sensitive
+
+```{marginfigure}
+
+[\\divxlc] This character class specifies a range of Roman numerals (i.e., "I", "V", "X", "L", or "C") that can appear immediately after the word "Chapter" and a space. The regular expression will match lines that begin with "Chapter" followed by a space and then any one of the specified Roman numerals, such as "Chapter I", "Chapter V", "Chapter X", and so on.
+
+```
+
+
+Notice that we chose the name word for the output column from unnest_tokens().
+This is a convenient choice because the sentiment lexicons and stop-word datasets
+have columns named word; performing inner joins and anti-joins is thus easier. Thus since the books are in the tidy data format, the next is to do the sentiment analysis. It is done as follows. Th explanation for the code meaning is in the side margin. First, let’s use the NRC lexicon and filter() for the joy words.
+Next, let’s filter() the data frame with the text from the book for the words from
+Emma and then use inner_join() to perform the sentiment analysis. What are the
+most common joy words in Emma? Let’s use count() from dplyr.
+
+
+
+```{r}
+
+# Filtering the sentimesnts which are "joy"
+nrcjoy <- get_sentiments("nrc") %>% 
+  filter(sentiment == "joy") 
+
+tidy_books %>% 
+  filter(book == "Emma") %>% 
+  inner_join(nrcjoy) %>% 
+  count(word, sort = TRUE)
+
+
+
+
+
+```
+
+
+
+
+```{marginfigure}
+
+The resulting filtered dataset is being joined with the nrcjoy dataset using the `inner_join` function from the dplyr package. An inner join only includes rows that have matching values in both datasets, based on the columns being joined. In this case, the join condition is not specified, so inner_join will automatically look for columns with the same name in both datasets and join on those columns. So in this case, So in this case, it has matched by words. The rows which have the similar words are returned. These affects the other columns. The other columns also are selected according to the word column
+
+```
+
+
+We see many positive, happy words about hope, friendship, and love here. Or instead we could examine how sentiment changes throughout each novel. We can
+do this with just a handful of lines that are mostly dplyr functions. First, we find a
+sentiment score for each word using the Bing lexicon and inner_join().
+Next, we count up how many positive and negative words there are in defined sections
+of each book. We define an index here to keep track of where we are in the narrative;
+this index (using integer division) counts up sections of 80 lines of text.
+
+Small sections of text may not have enough words in them to get a good estimate of
+sentiment, while really large sections can wash out narrative structure. For these
+books, using 80 lines works well, but this can vary depending on individual texts,
+how long the lines were to start with, etc. We then use spread() so that we have negative
+and positive sentiment in separate columns, and lastly calculate a net sentiment
+(positive - negative).
+
+```{r}
+library(tidyr)
+janeaustensentiment <- tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(book, index = linenumber %/% 80, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative)
+```
+
+
+Now we can plot these sentiment scores across the plot trajectory of each novel.
+Notice that we are plotting against the index on the x-axis that keeps track of narrative
+time in sections of text (Figure 2-2).
+
+```{r}
+library(ggplot2)
+ggplot(janeaustensentiment, aes(index, sentiment, fill = book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap( ~ book, ncol = 2, scales = "free_x")
+```
+
+Other packages such as **coreNLP**, **cleanNLP** and **sentimentr* try to understand the sentiment of a sentence as a whole and not individual words. 
+
+\section{\textcolor{red}{\huge\bfseries{Analyzing Word and Document Frequency}}}
+
+A central question in text mining and natural language processing is how to quantify
+what a document is about. Can we do this by looking at the words that make up the
+document? One measure of how important a word may be is its term frequency (tf),
+how frequently a word occurs in a document, as we examined in Chapter 1. 
+
+Another approach is to look at a term’s *inverse document frequency (idf)*, which
+decreases the weight for commonly used words and increases the weight for words
+that are not used very much in a collection of documents. This can be combined with
+term frequency to calculate a term’s *tf-idf* (the two quantities multiplied together), the frequency of a term adjusted for how rarely it is used. Lets find the term frequency in Jane Austen's Novels;
+
+```{r}
+library(dplyr)
+library(janeaustenr)
+library(tidytext)
+
+book_words <- austen_books() %>%
+  unnest_tokens(word, text) %>%
+  count(book, word, sort = TRUE) %>%
+  ungroup()
+total_words <- book_words %>%
+  group_by(book) %>%
+  summarize(total = sum(n))
+book_words <- left_join(book_words, total_words)
+book_words
+```
+
+
+Then the plot is as follows;
+
+```{r}
+library(ggplot2)
+ggplot(book_words, aes(n / total, fill = book)) +
+  geom_histogram(show.legend = FALSE) +
+  xlim(NA, 0.0009) +
+  facet_wrap( ~ book, ncol = 2, scales = "free_y")
+```
+
+
+There are very long tails to the right for these novels (those extremely common
+words!) that we have not shown in these plots. These plots exhibit similar distributions for all the novels, with many words that occur rarely and fewer words that occur frequently.
+
+
+
+Relationships Between Words:
+N-grams and Correlations
+
+So far we’ve considered words as individual units, and considered their relationships
+to sentiments or to documents. However, many interesting text analyses are based on
+the relationships between words, whether examining which words tend to follow others
+immediately, or words that tend to co-occur within the same documents.
+In this chapter, we’ll explore some of the methods tidytext offers for calculating and
+visualizing relationships between words in your text dataset. This includes the token
+= "ngrams" argument, which tokenizes by pairs of adjacent words rather than by
+individual ones. We’ll also introduce two new packages: ggraph, by Thomas Pedersen,
+which extends ggplot2 to construct network plots, and widyr, which calculates pairwise
+correlations and distances within a tidy data frame. Together these expand our
+toolbox for exploring text within the tidy data framework.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

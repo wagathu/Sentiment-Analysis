@@ -1,0 +1,375 @@
+---
+title: "The Wreck of the Titan Sentiment Analysis"
+runningheader: "Sentiment Analysis" # only for pdf output
+subtitle: "" # only for html output
+author: "B.M Njuguna"
+date: "`r Sys.Date()`"
+output:
+  tufte::tufte_html: default
+  tufte::tufte_handout:
+    citation_package: natbib
+    latex_engine: xelatex
+  tufte::tufte_book:
+    citation_package: biblatex
+    latex_engine: xelatex
+number_sections: no
+toc: no
+toc_depth: 4
+nocite: '@'
+bibliography: ref.bib
+aysep : " "
+natbib :
+  style : apa
+link-citations: yes
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(cache.extra = packageVersion('tufte'), comment = NA, warning = FALSE,
+                      message = FALSE, cache = TRUE, echo = FALSE, echo = TRUE)
+options(htmltools.dir.version = FALSE)
+
+```
+
+```{r, loading-packages,include=FALSE}
+# Loading the packages
+library(pacman)
+p_load(readxl, dplyr, ModelMetrics, tm, gmodels, ggplot2, wordcloud, knitr,stringr, Gmisc, tidyr)
+```
+
+\section{\textcolor{red}{\large\bfseries{Chapter One: Introduction}}}
+
+\subsection{\textcolor{blue}{1.o Background Information}}
+
+The **Wreck of the Titan** is a novel that was written by American
+writer **Morgan Robertson** (@robertson1912wreck) . It was first
+published in 1898, and then later republished in 1912. The fictional
+story is about a ship called *Titan* which sinks in the North Atlantic
+Ocean, after hitting a iceberg, resulting to loss of most of its
+passengers and crew. This novel was written 14 yeas before the sinking
+of the RMS Titanic ship in 1912. The similarities between the fictional
+story and the actual event of the sinking of the ship in 1912 have led
+to much speculations about whether Robertson's may have inspired or even
+predicted the Titanic Disaster.
+
+Robertson describes the ship as a large unsinkable passenger liner with
+many of the features similar to the titanic (@donnelly2000titanic). The
+ship in the fictional story travels at high speed in a sea filled with
+icebergs which is similar to the Titanic ship. The book's description
+about the sinking of the ship have similarities with the actual
+description of the sinking of the ship. Also, in the book, there are
+challenges such as lack of enough life boats and confusion among the
+crew which are similar to the actual sinking of the ship. The books
+prescient warning about the dangers of the overconfidence in the face of
+natural disasters.
+
+**Sentiment analysis** is a technique used to extract, identify and/or
+identify subjective information from text or novel
+(@mejova2009sentiment). It is a sub-field of Natural Language Processing
+that is also used to identify whether the sentiment of a text, novel or
+document is positive, negative or neutral. Sentiment analysis started in
+the 1950s with simple use of lexical (lexicons)[^1] and heuristics
+database to identify and classify words as positive and negative.
+However, these early attempts were limited by their accuracy and
+effectiveness.
+
+[^1]: Lexicons are dictionaries or lists of words and their meanings,
+    often used in natural language processing and computational
+    linguistics. They can also include additional information about
+    words such as part-of-speech, pronunciation, and syntactic behavior.
+    Lexicons can be created manually or automatically generated from
+    large text corpora.
+
+The field of sentiment analysis advanced significantly at around 2000
+with the invention of more sophisticated machine learning algorithms and
+the availability of large amounts of labelled data for training and
+testing (@mantyla2018evolution).
+
+\subsection{\textcolor{blue}{Objectives of the Study}}
+
+1.  The objective of this study was to examine the general sentiment of
+    the novel *The wreck of the titanic*.
+
+2.  Examine the change of emotions across the trajectory of the novel.
+
+3.  Compare the results of different performances of the lexicons used.
+
+\section{\textcolor{red}{Methodology}}
+
+Basically, sentiment analysis method was used in this study. The study
+was done using *R statistical package*. Specifically, lexicons in R were
+used to obtain the sentiment of the novels.
+
+First, The R package *gutenbergr* was used to download the novel in R.
+Then the R package *tidytext* was used to clean and put the text in the
+novel in the tidy format easier analysis. *tidytext* was also used to
+download the lexicons for the sentiment analysis. The three lexicons
+used for the analysis were as listed below;
+
+-   **AFINN**
+
+-   **Bing**
+
+-   **NRC**
+
+All three lexicons are based on unigrams, i.e., single words. These
+lexicons contain many English words and the words are assigned scores
+for positive/negative sentiment, and also possibly emotions like joy,
+anger, sadness, and so forth. The **NRC** lexicon **categorizes words in
+a binary fashion ("yes"/"no") into categories of positive**, **negative,
+anger, anticipation, disgust, fear, joy, sadness, surprise, and trust**.
+The **Bing** lexicon **categorizes words in a binary fashion into
+positive and negative categories**. The **AFINN** lexicon **assigns
+words with a score that runs between -5 and 5, with negative** **scores
+indicating negative sentiment and positive scores indicating positive
+sentiment**.
+
+\section{\textcolor{red}{Data Analysis}}
+
+The novel was downloaded in R and the glimpse of the first part of the
+first page is shown below;
+
+```{r}
+# Checking which id is the novel
+# Foirst we llok up for novels written by Robertson
+
+library(gutenbergr)
+robertson_books <- gutenberg_works(author == "Robertson, Morgan")
+
+# Downloading the novel after identifyig the ID of the novel
+
+titanic <- gutenberg_download(24880)
+cat(head(titanic$text, c(100)), sep = "\n")
+```
+
+Then the nrc, AFFIN and bing weren imported and the glimpse of the first few rows of the different lexicons are as shown below. The following is the nrc lexicons
+
+```{r}
+library(tidytext)
+get_sentiments("nrc") %>% 
+  head() %>% 
+  kable()
+```
+
+The following is the AFINN lexicon. As mentioned above, the AFINN lexicon scores the sentiments from -5 to 5, with the most negative sentiment being -5 and the most positive being 5
+
+```{r}
+get_sentiments("afinn") %>% 
+  head() %>% 
+  kable()
+```
+
+The lexicon bing lexicon is as shown below;
+
+```{r,}
+get_sentiments("bing") %>% 
+  head() %>% 
+  kable()
+```
+
+
+\subsection{\textcolor{blue}{Most Common Words}}
+
+The most common words were identified and visualized as follows;
+
+```{r, out.width = "110%"}
+
+
+titanic <- titanic %>% 
+  mutate(linenumber = row_number(),
+         chpater = cumsum(str_detect(text, regex("^chapter", ignore_case = TRUE))))
+
+
+titanic <- titanic %>% 
+  unnest_tokens(word, text)
+
+
+titanic %>% 
+  count(word, sort = TRUE) %>% 
+  filter(n > 500 ) %>% 
+  mutate(word = reorder(word, n)) %>% 
+  ggplot(aes(word, n)) +
+  geom_col(fill = "black", col = "white") +
+  xlab(NULL) +
+  coord_flip() +
+  theme(axis.line = element_line()) +
+  theme_bw()
+  
+```
+
+The word `the` was the most used word in the novel, followed by the word `and`. However these words are usually classified as stop words in sentiment analysis and hence showing the frequency of their usage in a novel do not have much interpretation. Thus, the stop words were removed and the following plot was obtained.
+
+```{r, out.width = "110%"}
+
+data("stop_words")
+titanic2 <- titanic %>% 
+  anti_join(stop_words)
+
+  
+titanic2 %>% 
+  count(word, sort = TRUE) %>% 
+  filter(n > 80 ) %>% 
+  mutate(word = reorder(word, n)) %>% 
+  ggplot(aes(word, n)) +
+  geom_col(fill = "black", col = "white") +
+  xlab(NULL) +
+  coord_flip() +
+  theme(axis.line = element_line()) +
+  theme_bw()
+
+```
+
+Thus, the most frequently used word in the novel was `Denman`. Denman is a character in the novel who was the owner of the ship. Other words that followed in the frequency of use were deck, jenkins, boat and answered.
+
+\subsection{\textcolor{blue}{Term Frequency}}
+
+Term frequency is the number of times a word appear in a novel divided by the total number of words in the novel. Below shows some of the words and the number of times used in the novel. This number was inclusive of the stop words.
+
+```{r}
+titanic <- titanic %>%
+  count(word, sort = TRUE) %>% 
+  mutate(total = sum(n))
+```
+
+The word Denman has been used 315 times out of the total 25728 times. The plot below shows the term frequency of the words;
+
+```{r, out.width = "110%"}
+titanic %>% 
+  ggplot(aes(n/total)) +
+  xlim(NA, 0.0004) + 
+  geom_histogram(col = "white", fill = "black") +
+  theme_bw() +
+  xlab("term frequency")
+
+#The xlim function is used to set the x-axis limits of the plot. In this case, it is restricting the plot to show data only up to 0.0009 on the x-axis.
+```
+
+
+As can been seen from the above plot, there was a long tail to the right, due to the extremely frequent word. The above plot was similar to that of many novels. That is the many words occur rarely and the few words that occur frequently.
+
+\subsection{\textcolor{blue}{Sentiment Analysis with Inner Join}}
+
+Since the data was in the tidy format. Inner joi was used to classify the general mood of the novel across the trajectory of the novel. The nrc lexicon was used in this analysis.
+
+```{r}
+nrcjoy <- get_sentiments("nrc")
+
+titanic4 <- titanic %>% 
+  select(-c("n", "total")) %>% 
+  inner_join(nrcjoy)
+head(titanic4) %>% kable()
+
+```
+According to the nrc lexicons, words such as `forwad`, `captian` were classified as positive, while words such as `time` and `good` were classified as of *anticipation* mood. The table below shows the count of the specific categories of words in the novel as classified by the nrc lexicon
+
+```{r}
+titanic5 <- titanic4 %>% 
+  group_by(sentiment) %>% 
+  count(word, sort = TRUE) %>% 
+  summarise(total = sum(n))
+
+kable(titanic5)
+```
+
+The above data was represented in a bar graph as follows;
+
+```{r, out.width = "110%"}
+titanic5 <- titanic5%>%
+  mutate(percent = (total/sum(total))*100)
+
+titanic5 <- titanic5[order(-titanic5$percent),]
+titanic5 %>% 
+  ggplot(aes(x = reorder(sentiment,-percent))) +
+  geom_col(aes(y = percent),position = position_dodge2(), fill = "black") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1), legend.key.size =unit(4, "pt"),  #changing the size of the legend
+        legend.position = "none") + #this removes it)
+
+  scale_y_continuous(labels = scales::label_percent(scale = 1)) +
+  xlab("Sentiment") 
+
+
+```
+
+According to the nrc lexicon. most words were negative. The category of words which came second were the positive words while the fear-words came third. The tragic nature of the story may have resulted in the use of negative words-the ship was *unsinkable* yet it sinks after hitting an iceberg. Also, the writinh style at the time at which this novel was written could have attributed to many words being classified as negative.
+
+The bing lexicon was also used to compare its results with the results obtained from the nrc lexicon.
+
+```{r}
+bing <- get_sentiments("bing")
+
+titanic6 <- titanic %>% 
+  select(-c("n", "total")) %>% 
+  inner_join(bing)
+head(titanic6) %>% 
+  kable()
+```
+The plot of the positive words versus the negative words was as shown below;
+
+```{r, out.width = "110%"}
+titanic6 <- titanic6 %>% 
+  group_by(sentiment) %>% 
+  count(word, sort = TRUE) %>% 
+  summarise(total = sum(n))
+
+titanic6 <- titanic6 %>% 
+  mutate(percent = total/sum(total)*100)
+
+titanic6 %>% 
+  ggplot(aes(x = reorder(sentiment, -percent))) +
+  geom_col(aes(y = percent), width = .3, fill = "black") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_bw() +
+  xlab("sentiment")
+```
+
+
+The results obtained from the bing lexicon are similar to the results obtained after using the nrc lexicon. The negative words dominate.
+
+\subsection{\textcolor{blue}{The Sentiments of the Novel in the Novel's Trajectory}}
+
+To determine how the sentiments changed across the trajectory of the novel. the AFINN lexicon was used. The following graph was obtained;
+
+```{r,out.width = "110%"}
+titanic <- gutenberg_download(24880)
+titanic <- titanic %>% 
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter", ignore_case = TRUE))))
+
+titanic <- titanic %>% 
+  unnest_tokens(word, text)
+
+af <- get_sentiments("afinn")
+titanic <- titanic %>% 
+  inner_join(af) %>% 
+  group_by(index = linenumber %/% 50) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "AFINN")
+
+titanic %>% 
+  ggplot(aes(x = index)) +
+  geom_line(aes(y = sentiment), fill= "black", linewidth = .6) +
+  theme_bw()
+```
+
+
+From the plot above, the most positive and negative words are many at the start of the novel. This may be because of the situation when boarding the ship,some people could have used negative words due to occurrences such as delay. They could have also used positive words due to the joy of boarding the popular ship. The score of the words reduce or stabilize towards the center of the novel. At the end of the novel, most words become negative. This could be attributed by the sinking of the ship towards the end of the novel. The cursing, despair could attribute to the negative words.
+
+\newpage
+
+
+
+
+
+
+
+
+
+
+
+
+
